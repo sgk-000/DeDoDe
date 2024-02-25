@@ -16,8 +16,12 @@ class DeDoDeDetector(nn.Module):
         self.decoder = decoder
         import torchvision.transforms as transforms
         self.normalizer = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+<<<<<<< Updated upstream:DeDoDe/detectors/dedode_detector.py
         self.remove_borders = remove_borders
         
+=======
+
+>>>>>>> Stashed changes:src/DeDoDe/detectors/dedode_detector.py
     def forward(
         self,
         batch,

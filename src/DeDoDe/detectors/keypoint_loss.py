@@ -171,7 +171,7 @@ class KeyPointLoss(nn.Module):
         tot_loss = joint_log_likelihood_loss + self.matchability_weight * matchability_loss# 
         if torch.rand(1) > 1:
             print(f"Precent Inlier: {self.tracked_metrics.get('mega_percent_inliers', 0)}")
-            print(f"{joint_log_likelihood_loss=} {matchability_loss=}")
+            print(f"{joint_log_likelihood_loss} {matchability_loss}")
             print(f"Total Loss: {tot_loss.item()}")
         return  tot_loss
     

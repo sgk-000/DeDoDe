@@ -10,7 +10,7 @@ from PIL import Image
 from einops import rearrange
 import torch
 from time import perf_counter
-
+from typing import Tuple
 
 def get_best_device(verbose = False):
     device = torch.device('cpu')
@@ -80,7 +80,7 @@ def get_grid(B,H,W, device = get_best_device()):
     return x1_n
 
 @torch.no_grad()
-def finite_diff_hessian(f: tuple(["B", "H", "W"]), device = get_best_device()):
+def finite_diff_hessian(f, device = get_best_device()):
     dxx = torch.tensor([[0,0,0],[1,-2,1],[0,0,0]], device = device)[None,None]/2
     dxy = torch.tensor([[1,0,-1],[0,0,0],[-1,0,1]], device = device)[None,None]/4
     dyy = dxx.mT
@@ -90,7 +90,7 @@ def finite_diff_hessian(f: tuple(["B", "H", "W"]), device = get_best_device()):
     H = torch.stack((Hxx, Hxy, Hxy, Hyy), dim = -1).reshape(*f.shape,2,2)
     return H
 
-def finite_diff_grad(f: tuple(["B", "H", "W"]), device = get_best_device()):
+def finite_diff_grad(f, device = get_best_device()):
     dx = torch.tensor([[0,0,0],[-1,0,1],[0,0,0]],device = device)[None,None]/2
     dy = dx.mT
     gx = F.conv2d(f[:,None], dx, padding = 1)
@@ -98,11 +98,11 @@ def finite_diff_grad(f: tuple(["B", "H", "W"]), device = get_best_device()):
     g = torch.cat((gx, gy), dim = 1)
     return g
 
-def fast_inv_2x2(matrix: tuple[...,2,2], eps = 1e-10):
+def fast_inv_2x2(matrix, eps = 1e-10):
     return 1/(torch.linalg.det(matrix)[...,None,None]+eps) * torch.stack((matrix[...,1,1],-matrix[...,0,1],
                                                      -matrix[...,1,0],matrix[...,0,0]),dim=-1).reshape(*matrix.shape)
 
-def newton_step(f:tuple["B","H","W"], inds, device = get_best_device()):
+def newton_step(f, inds, device = get_best_device()):
     B,H,W = f.shape
     Hess = finite_diff_hessian(f).reshape(B,H*W,2,2)
     Hess = torch.gather(Hess, dim = 1, index = inds[...,None].expand(B,-1,2,2))
@@ -420,7 +420,7 @@ class TupleNormalize(object):
     def __call__(self, im_tuple):
         c,h,w = im_tuple[0].shape
         if c > 3:
-            warnings.warn(f"Number of channels {c=} > 3, assuming first 3 are rgb")
+            warnings.warn(f"Number of channels {c} > 3, assuming first 3 are rgb")
         return [self.normalize(im[:3]) for im in im_tuple]
 
     def __repr__(self):
@@ -677,7 +677,7 @@ def get_homog_warp(Homog, H, W, device = get_best_device()):
     mask = ((x_A_to_B > -1) * (x_A_to_B < 1)).prod(dim=-1).float()
     return torch.cat((x_A.expand(*x_A_to_B.shape), x_A_to_B),dim=-1), mask
 
-def dual_log_softmax_matcher(desc_A: tuple['B','N','C'], desc_B: tuple['B','M','C'], inv_temperature = 1, normalize = False):
+def dual_log_softmax_matcher(desc_A, desc_B, inv_temperature = 1, normalize = False):
     B, N, C = desc_A.shape
     if normalize:
         desc_A = desc_A/desc_A.norm(dim=-1,keepdim=True)
@@ -688,7 +688,7 @@ def dual_log_softmax_matcher(desc_A: tuple['B','N','C'], desc_B: tuple['B','M','
     logP = corr.log_softmax(dim = -2) + corr.log_softmax(dim= -1)
     return logP
 
-def dual_softmax_matcher(desc_A: tuple['B','N','C'], desc_B: tuple['B','M','C'], inv_temperature = 1, normalize = False):
+def dual_softmax_matcher(desc_A, desc_B, inv_temperature = 1, normalize = False):
     if len(desc_A.shape) < 3:
         desc_A, desc_B = desc_A[None], desc_B[None]
     B, N, C = desc_A.shape
@@ -701,7 +701,7 @@ def dual_softmax_matcher(desc_A: tuple['B','N','C'], desc_B: tuple['B','M','C'],
     P = corr.softmax(dim = -2) * corr.softmax(dim= -1)
     return P
 
-def conditional_softmax_matcher(desc_A: tuple['B','N','C'], desc_B: tuple['B','M','C'], inv_temperature = 1, normalize = False):
+def conditional_softmax_matcher(desc_A, desc_B, inv_temperature = 1, normalize = False):
     if len(desc_A.shape) < 3:
         desc_A, desc_B = desc_A[None], desc_B[None]
     B, N, C = desc_A.shape
@@ -713,5 +713,5 @@ def conditional_softmax_matcher(desc_A: tuple['B','N','C'], desc_B: tuple['B','M
         corr = torch.einsum("b n c, b m c -> b n m", desc_A, desc_B) * inv_temperature
     P_B_cond_A = corr.softmax(dim = -1)
     P_A_cond_B = corr.softmax(dim = -2)
-    
-    return P_A_cond_B, P_B_cond_A 
+
+    return P_A_cond_B, P_B_cond_A
